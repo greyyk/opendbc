@@ -149,6 +149,10 @@ class HyundaiFlags(IntFlag):
 
   HAS_BSM = 2 ** 27  # blind spot monitoring
 
+  # ccNC infotainment platform (Kia K4/K5, Hyundai Kona/Sonata/Tucson, etc.)
+  # Uses the alternate blinker lamps on CAN FD.
+  CCNC = 2 ** 28
+
 
 @dataclass
 class HyundaiCarDocs(CarDocs):
@@ -400,6 +404,11 @@ class CAR(Platforms):
       HyundaiCarDocs("Kia Forte 2022-23", car_parts=CarParts.common([CarHarness.hyundai_e])),
     ],
     CarSpecs(wheelbase=2.8, steerRatio=13.75, tireStiffnessFactor=0.5)
+  )
+  KIA_K4_2025 = HyundaiCanFDPlatformConfig(
+    [HyundaiCarDocs("Kia K4 (with HDA II) 2025", car_parts=CarParts.common([CarHarness.hyundai_r]))],
+    CarSpecs(wheelbase=2.72, steerRatio=13.4),
+    flags=HyundaiFlags.CCNC,
   )
   KIA_K5_2021 = HyundaiPlatformConfig(
     [HyundaiCarDocs("Kia K5 2021-24", car_parts=CarParts.common([CarHarness.hyundai_a]))],

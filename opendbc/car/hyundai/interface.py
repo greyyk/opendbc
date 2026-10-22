@@ -61,6 +61,14 @@ class CarInterface(CarInterfaceBase):
         if not ret.flags & HyundaiFlags.CANFD_RADAR_SCC:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
 
+      # This port only implements lateral control for the K4 with HDA II (LKA steering).
+      # Never enable openpilot longitudinal control; the ADAS ECU rejects it.
+      if candidate == CAR.KIA_K4_2025:
+        ret.alphaLongitudinalAvailable = False
+        # Do not allow a non-HDA II K4 to engage with an incomplete CCNC implementation.
+        if not lka_steering:
+          ret.dashcamOnly = True
+
       # Some LKA steering cars have alternative messages for gear checks
       # ICE cars do not have 0x130; GEARS message on 0x40 or 0x70 instead
       if 0x130 not in fingerprint[CAN.ECAN]:

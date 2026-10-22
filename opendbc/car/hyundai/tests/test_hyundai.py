@@ -70,6 +70,23 @@ class TestHyundaiFingerprint(unittest.TestCase):
       CP = CarInterface.get_params(CAR.HYUNDAI_SONATA, fingerprint, [], False, False, False)
       assert CP.radarUnavailable != radar
 
+  def test_k4_hda2_lateral_only(self):
+    # The K4 port is lateral-only and only supports the HDA II (LKA steering) variant.
+    fingerprint = gen_empty_fingerprint()
+    cam_can = CanBus(None, fingerprint).CAM
+    fingerprint[cam_can] = [0x110]  # LKAS_ALT from the camera
+    CP = CarInterface.get_params(CAR.KIA_K4_2025, fingerprint, [], False, False, False)
+    assert CP.flags & HyundaiFlags.CCNC
+    assert CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG
+    assert CP.safetyConfigs[-1].safetyParam == (HyundaiSafetyFlags.CANFD_LKA_STEER_MSG | HyundaiSafetyFlags.CANFD_LKA_STEER_MSG_ALT)
+    assert not CP.alphaLongitudinalAvailable
+    assert not CP.openpilotLongitudinalControl
+    assert not CP.dashcamOnly
+
+    # No LKA steering means this is not the supported HDA II architecture.
+    CP = CarInterface.get_params(CAR.KIA_K4_2025, gen_empty_fingerprint(), [], False, False, False)
+    assert CP.dashcamOnly
+
   def test_alternate_limits(self):
     # Alternate lateral control limits, for high torque cars, verify Panda safety mode flag is set
     fingerprint = gen_empty_fingerprint()

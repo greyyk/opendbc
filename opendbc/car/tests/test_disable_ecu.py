@@ -1,9 +1,13 @@
 import unittest
+from unittest import mock
 
+from opendbc.car import structs
 from opendbc.car.can_definitions import CanData
 from opendbc.car.disable_ecu import disable_ecu
 from opendbc.car.hyundai import adas_uds_probe
 from opendbc.car.hyundai.adas_uds_probe import probe_adas_ecu
+from opendbc.car.hyundai.interface import CarInterface
+from opendbc.car.hyundai.values import CAR, HyundaiFlags
 from opendbc.car.uds import get_negative_response_description
 
 
@@ -86,6 +90,51 @@ class TestDisableEcu(unittest.TestCase):
 
     self.assertFalse(result)
     self.assertTrue(ecu.scc_enabled)
+
+  def test_skips_when_verification_target_is_absent(self):
+    ecu = FakeEcu({
+      b'\x10\x03': b'\x50\x03',
+    })
+    ecu.scc_enabled = False
+
+    with self.assertLogs('carlog', level='ERROR') as logs:
+      result = disable_ecu(ecu.can_recv, ecu.can_send, bus=1, addr=0x730, verify_addr=0x1A0, verify_timeout=0.01)
+
+    self.assertFalse(result)
+    self.assertFalse(any(msg.address == 0x730 for msg in ecu.sent))
+    self.assertTrue(any('cannot be verified' in line for line in logs.output))
+
+
+class TestK4ProbeInvocation(unittest.TestCase):
+  @staticmethod
+  def _params():
+    cp = structs.CarParams()
+    cp.carFingerprint = CAR.KIA_K4_2025
+    cp.openpilotLongitudinalControl = True
+    cp.flags = HyundaiFlags.CANFD.value | HyundaiFlags.CANFD_LKA_STEER_MSG.value
+    cp.safetyConfigs = [structs.CarParams.SafetyConfig()]
+    return cp, structs.CarParamsSP()
+
+  def test_probe_runs_when_default_disable_fails(self):
+    cp, cp_sp = self._params()
+    with mock.patch('opendbc.car.hyundai.interface.disable_ecu', return_value=False) as disable, \
+         mock.patch('opendbc.car.hyundai.interface.probe_adas_ecu') as probe:
+      CarInterface.init(cp, cp_sp, lambda *_: None, lambda *_: None)
+
+    self.assertEqual(disable.call_args.kwargs['addr'], 0x730)
+    self.assertEqual(disable.call_args.kwargs['bus'], 1)
+    self.assertEqual(disable.call_args.kwargs['com_cont_req'], b'\x28\x83\x01')
+    probe.assert_called_once()
+    self.assertEqual(probe.call_args.kwargs['addr'], 0x730)
+    self.assertEqual(probe.call_args.kwargs['verify_addr'], 0x1A0)
+
+  def test_probe_does_not_run_for_explicit_communication_control(self):
+    cp, cp_sp = self._params()
+    with mock.patch('opendbc.car.hyundai.interface.disable_ecu', return_value=False), \
+         mock.patch('opendbc.car.hyundai.interface.probe_adas_ecu') as probe:
+      CarInterface.init(cp, cp_sp, lambda *_: None, lambda *_: None, communication_control=b'\x28\x00\x01')
+
+    probe.assert_not_called()
 
 
 class TestAdasUdsProbe(unittest.TestCase):

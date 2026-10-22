@@ -67,6 +67,9 @@ def disable_ecu(can_recv, can_send, bus=0, addr=0x7d0, sub_addr=None, com_cont_r
     drain_can(can_recv)
     verify_present = can_addr_seen(can_recv, verify_bus, verify_addr, verify_timeout)
     carlog.warning(f'ecu disable verification: {hex(verify_addr)} present before request: {verify_present}')
+    if not verify_present:
+      carlog.error(f'ecu disable skipped: {hex(verify_addr)} is not transmitting, so silence cannot be verified')
+      return False
 
   for i in range(retry):
     try:

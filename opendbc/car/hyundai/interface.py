@@ -232,8 +232,9 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def init(CP, CP_SP, can_recv, can_send, communication_control=None):
+    default_communication_control = communication_control is None
     # 0x80 silences response
-    if communication_control is None:
+    if default_communication_control:
       communication_control = bytes([uds.SERVICE_TYPE.COMMUNICATION_CONTROL, 0x80 | uds.CONTROL_TYPE.DISABLE_RX_DISABLE_TX, uds.MESSAGE_TYPE.NORMAL])
 
     if CP.openpilotLongitudinalControl and not ((CP.flags & (HyundaiFlags.CANFD_CAMERA_SCC | HyundaiFlags.CAMERA_SCC)) or
@@ -246,7 +247,7 @@ class CarInterface(CarInterfaceBase):
       # Verify the result and, on failure, run a guarded probe that restores the ECU when done.
       verify_addr = 0x1A0 if CP.carFingerprint == CAR.KIA_K4_2025 and addr == 0x730 and not os.environ.get('REPLAY') else None
       disabled = disable_ecu(can_recv, can_send, bus=bus, addr=addr, com_cont_req=communication_control, verify_addr=verify_addr)
-      if not disabled and verify_addr is not None and communication_control is None:
+      if not disabled and verify_addr is not None and default_communication_control:
         probe_adas_ecu(can_recv, can_send, bus, addr=addr, verify_addr=verify_addr)
 
     # for blinkers

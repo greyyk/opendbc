@@ -1,9 +1,12 @@
+import os
+
 from opendbc.car import Bus, get_safety_config, structs, uds
 from opendbc.car.hyundai.hyundaicanfd import CanBus
 from opendbc.car.hyundai.values import HyundaiFlags, CAR, DBC, HyundaiSafetyFlags
 from opendbc.car.hyundai.radar_interface import RADAR_START_ADDR
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.car.disable_ecu import disable_ecu
+from opendbc.car.hyundai.adas_uds_probe import probe_adas_ecu
 from opendbc.car.hyundai.carcontroller import CarController
 from opendbc.car.hyundai.carstate import CarState
 from opendbc.car.hyundai.radar_interface import RadarInterface
@@ -238,7 +241,13 @@ class CarInterface(CarInterfaceBase):
       addr, bus = 0x7d0, CanBus(CP).ECAN if CP.flags & HyundaiFlags.CANFD else 0
       if CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG.value:
         addr, bus = 0x730, CanBus(CP).ECAN
-      disable_ecu(can_recv, can_send, bus=bus, addr=addr, com_cont_req=communication_control)
+
+      # The K4 ADAS ECU rejects disable requests on some firmware and keeps sending SCC_CONTROL.
+      # Verify the result and, on failure, run a guarded probe that restores the ECU when done.
+      verify_addr = 0x1A0 if CP.carFingerprint == CAR.KIA_K4_2025 and addr == 0x730 and not os.environ.get('REPLAY') else None
+      disabled = disable_ecu(can_recv, can_send, bus=bus, addr=addr, com_cont_req=communication_control, verify_addr=verify_addr)
+      if not disabled and verify_addr is not None and communication_control is None:
+        probe_adas_ecu(can_recv, can_send, bus, addr=addr, verify_addr=verify_addr)
 
     # for blinkers
     if CP.flags & HyundaiFlags.CANFD_ENABLE_BLINKERS:

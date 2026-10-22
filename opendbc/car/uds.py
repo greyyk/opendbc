@@ -311,6 +311,10 @@ _negative_response_codes = {
 }
 
 
+def get_negative_response_description(error_code: int) -> str:
+  return _negative_response_codes.get(error_code, f'unknown (0x{error_code:02x})')
+
+
 def get_dtc_num_as_str(dtc_num_bytes):
   # ISO 15031-6
   designator = {
